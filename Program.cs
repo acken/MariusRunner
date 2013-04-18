@@ -35,108 +35,108 @@ namespace runner
 		private static bool weHaveWaitedMoreThanFiveSecondsFrom(DateTime startTime) {
 			return DateTime.Now > startTime.AddSeconds(5);
 		}
+	}
 
-		interface ITest
-		{
-			string Name { get; }
-			bool IsRunning { get; }
-			void HandleFeedbackThrough(Action<string> feedbackHandler);
-			void Run();
-			void Abort();
+	interface ITest
+	{
+		string Name { get; }
+		bool IsRunning { get; }
+		void HandleFeedbackThrough(Action<string> feedbackHandler);
+		void Run();
+		void Abort();
+	}
+
+	class TestRunner
+	{
+		private bool _abortRun;
+		private Action<string> _testFeedbackHandler = (msg) => {};
+		private Action<string> _testStarted = (test) => {};
+		private List<ITest> _tests = new List<ITest>();
+
+		public bool IsRunning { get; private set; }
+
+		public TestRunner HandleTestFeedbackThrough(Action<string> testFeedbackHandler) {
+			_testFeedbackHandler = testFeedbackHandler;
+			return this;
 		}
 
-		class TestRunner
-		{
-			private bool _abortRun;
-			private Action<string> _testFeedbackHandler = (msg) => {};
-			private Action<string> _testStarted = (test) => {};
-			private List<ITest> _tests = new List<ITest>();
-
-			public bool IsRunning { get; private set; }
-
-			public TestRunner HandleTestFeedbackThrough(Action<string> testFeedbackHandler) {
-				_testFeedbackHandler = testFeedbackHandler;
-				return this;
-			}
-
-			public TestRunner HandleTestStartedThrough(Action<string> testStarted) {
-				_testStarted = testStarted;
-				return this;
-			}
-
-			public void Run() {
-				new Thread(runAllTests).Start();
-			}
-
-			public void Abort() {
-				_abortRun = true;
-			}
-
-			public void AddTest(ITest test) {
-				test.HandleFeedbackThrough(_testFeedbackHandler);
-				_tests.Add(test);
-			}
-
-			private void runAllTests() {
-				IsRunning = true;
-				_abortRun = false;
-				foreach (var test in _tests) {
-					try {
-						runTest(test);
-						if (_abortRun)
-							break;
-					} catch (Exception ex) {
-						_testFeedbackHandler("PANIC test failed:");
-						_testFeedbackHandler(ex.ToString());
-					}
-				}
-				IsRunning = false;
-			}
-
-			private void runTest(ITest test) {
-				var testIsAborting = false;
-				_testStarted(test.Name);
-				test.Run();
-				while (test.IsRunning) {
-					if (_abortRun && !testIsAborting) {
-						test.Abort();
-						testIsAborting = true;
-					}
-				}
-			}
+		public TestRunner HandleTestStartedThrough(Action<string> testStarted) {
+			_testStarted = testStarted;
+			return this;
 		}
 
-		class Test1 : ITest
-		{
-			private bool _isAborting = false;
-			private Action<string> _feedbackHandler = (msg) => {};
+		public void Run() {
+			new Thread(runAllTests).Start();
+		}
 
-			public string Name { get { return "Test 1"; } }
-			public bool IsRunning { get; private set; }
+		public void Abort() {
+			_abortRun = true;
+		}
 
-			public void HandleFeedbackThrough(Action<string> feedbackHandler) {
-				_feedbackHandler = feedbackHandler;
-			}
+		public void AddTest(ITest test) {
+			test.HandleFeedbackThrough(_testFeedbackHandler);
+			_tests.Add(test);
+		}
 
-			public void Run() {
-				IsRunning = true;
-				new Thread(runTest).Start();
-			}
-
-			public void Abort()	 {
-				_isAborting = true;
-			}	
-
-			private void runTest() {
-				_isAborting = false;	
-				for (int i = 1; i < 10; i++) {
-					if (_isAborting)
+		private void runAllTests() {
+			IsRunning = true;
+			_abortRun = false;
+			foreach (var test in _tests) {
+				try {
+					runTest(test);
+					if (_abortRun)
 						break;
-					_feedbackHandler("Running step " + i.ToString());
-					Thread.Sleep(1000);
+				} catch (Exception ex) {
+					_testFeedbackHandler("PANIC test failed:");
+					_testFeedbackHandler(ex.ToString());
 				}
-				IsRunning = false;
 			}
+			IsRunning = false;
+		}
+
+		private void runTest(ITest test) {
+			var testIsAborting = false;
+			_testStarted(test.Name);
+			test.Run();
+			while (test.IsRunning) {
+				if (_abortRun && !testIsAborting) {
+					test.Abort();
+					testIsAborting = true;
+				}
+			}
+		}
+	}
+
+	class Test1 : ITest
+	{
+		private bool _isAborting = false;
+		private Action<string> _feedbackHandler = (msg) => {};
+
+		public string Name { get { return "Test 1"; } }
+		public bool IsRunning { get; private set; }
+
+		public void HandleFeedbackThrough(Action<string> feedbackHandler) {
+			_feedbackHandler = feedbackHandler;
+		}
+
+		public void Run() {
+			IsRunning = true;
+			new Thread(runTest).Start();
+		}
+
+		public void Abort()	 {
+			_isAborting = true;
+		}	
+
+		private void runTest() {
+			_isAborting = false;	
+			for (int i = 1; i < 10; i++) {
+				if (_isAborting)
+					break;
+				_feedbackHandler("Running step " + i.ToString());
+				Thread.Sleep(1000);
+			}
+			IsRunning = false;
 		}
 	}
 }
